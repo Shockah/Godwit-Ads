@@ -5,9 +5,6 @@ import org.robovm.apple.foundation.NSMutableArray;
 import org.robovm.apple.foundation.NSString;
 import org.robovm.apple.uikit.UIViewController;
 
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -21,7 +18,8 @@ public class IosAdColonyPlatformProvider extends AdColonyPlatformProvider {
 
 	private AdColonyZone zone = null;
 	@Nullable private AdColonyInterstitial awaitingAd = null;
-	@Nonnull private final Lock adLock = new ReentrantLock();
+	private boolean retrieving = false;
+	@Nonnull private final Object adLock = new Object();
 
 	public IosAdColonyPlatformProvider(@Nonnull UIViewController controller) {
 		this.controller = controller;
@@ -41,32 +39,39 @@ public class IosAdColonyPlatformProvider extends AdColonyPlatformProvider {
 
 	private void requestInterstitial() {
 		synchronized (adLock) {
-			adLock.lock();
+			if (retrieving)
+				return;
+
 			awaitingAd = null;
+			retrieving = true;
 			AdColony.requestInterstitial(zone.getIdentifier(), null, ad -> {
 				awaitingAd = ad;
 				ad.setExpire(this::requestInterstitial);
 				ad.setClose(this::requestInterstitial);
-				adLock.unlock();
+				retrieving = false;
 			}, error -> {
 				System.out.println(error.description());
-				adLock.unlock();
+				retrieving = false;
 			});
 		}
 	}
 
 	private void showAd(@Nullable AdProvider.RewardCallback rewardCallback) {
 		synchronized (adLock) {
-			adLock.lock();
+			while (retrieving) {
+				try {
+					wait();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
 
 			if (awaitingAd == null) {
-				adLock.unlock();
 				requestInterstitial();
 				if (awaitingAd == null) {
 					System.out.println("No ads to display.");
 					return;
 				}
-				adLock.lock();
 			}
 
 			AdColonyInterstitial ad = awaitingAd;
@@ -80,8 +85,6 @@ public class IosAdColonyPlatformProvider extends AdColonyPlatformProvider {
 
 			awaitingAd = null;
 			ad.show(controller);
-
-			adLock.unlock();
 		}
 	}
 

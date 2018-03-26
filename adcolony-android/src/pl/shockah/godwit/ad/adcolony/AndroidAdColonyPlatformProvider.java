@@ -8,8 +8,6 @@ import com.adcolony.sdk.AdColonyInterstitialListener;
 import com.adcolony.sdk.AdColonyZone;
 
 import java.lang.ref.WeakReference;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -21,7 +19,8 @@ public class AndroidAdColonyPlatformProvider extends AdColonyPlatformProvider {
 
 	private String firstZoneId;
 	@Nullable private AdColonyInterstitial awaitingAd = null;
-	@Nonnull private final Lock adLock = new ReentrantLock();
+	private boolean retrieving = false;
+	@Nonnull private final Object adLock = new Object();
 
 	public AndroidAdColonyPlatformProvider(@Nonnull FragmentActivity activity) {
 		activityRef = new WeakReference<>(activity);
@@ -40,19 +39,24 @@ public class AndroidAdColonyPlatformProvider extends AdColonyPlatformProvider {
 
 	private void requestInterstitial() {
 		synchronized (adLock) {
-			adLock.lock();
+			if (retrieving)
+				return;
+
 			awaitingAd = null;
+			retrieving = true;
 			AdColony.requestInterstitial(firstZoneId, new AdColonyInterstitialListener() {
 				@Override
 				public void onRequestFilled(AdColonyInterstitial ad) {
 					awaitingAd = ad;
-					adLock.unlock();
+					retrieving = false;
+					AndroidAdColonyPlatformProvider.this.notify();
 				}
 
 				@Override
 				public void onRequestNotFilled(AdColonyZone zone) {
 					System.out.println("Couldn't retrieve an interstitial.");
-					adLock.unlock();
+					retrieving = false;
+					AndroidAdColonyPlatformProvider.this.notify();
 				}
 
 				@Override
@@ -70,16 +74,20 @@ public class AndroidAdColonyPlatformProvider extends AdColonyPlatformProvider {
 
 	private void showAd(@Nullable AdProvider.RewardCallback rewardCallback) {
 		synchronized (adLock) {
-			adLock.lock();
+			while (retrieving) {
+				try {
+					wait();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
 
 			if (awaitingAd == null) {
-				adLock.unlock();
 				requestInterstitial();
 				if (awaitingAd == null) {
 					System.out.println("No ads to display.");
 					return;
 				}
-				adLock.lock();
 			}
 
 			AdColonyInterstitial ad = awaitingAd;
@@ -93,8 +101,6 @@ public class AndroidAdColonyPlatformProvider extends AdColonyPlatformProvider {
 
 			awaitingAd = null;
 			ad.show();
-
-			adLock.unlock();
 		}
 	}
 

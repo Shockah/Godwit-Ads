@@ -45,13 +45,19 @@ public class IosAdColonyPlatformProvider extends AdColonyPlatformProvider {
 			awaitingAd = null;
 			retrieving = true;
 			AdColony.requestInterstitial(zone.getIdentifier(), null, ad -> {
-				awaitingAd = ad;
-				ad.setExpire(this::requestInterstitial);
-				ad.setClose(this::requestInterstitial);
-				retrieving = false;
+				synchronized (adLock) {
+					awaitingAd = ad;
+					ad.setExpire(this::requestInterstitial);
+					ad.setClose(this::requestInterstitial);
+					retrieving = false;
+					adLock.notify();
+				}
 			}, error -> {
-				System.out.println(error.description());
-				retrieving = false;
+				synchronized (adLock) {
+					System.out.println(error.description());
+					retrieving = false;
+					adLock.notify();
+				}
 			});
 		}
 	}
@@ -60,7 +66,7 @@ public class IosAdColonyPlatformProvider extends AdColonyPlatformProvider {
 		synchronized (adLock) {
 			while (retrieving) {
 				try {
-					wait();
+					adLock.wait();
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}

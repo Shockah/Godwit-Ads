@@ -47,16 +47,20 @@ public class AndroidAdColonyPlatformProvider extends AdColonyPlatformProvider {
 			AdColony.requestInterstitial(firstZoneId, new AdColonyInterstitialListener() {
 				@Override
 				public void onRequestFilled(AdColonyInterstitial ad) {
-					awaitingAd = ad;
-					retrieving = false;
-					AndroidAdColonyPlatformProvider.this.notify();
+					synchronized (adLock) {
+						awaitingAd = ad;
+						retrieving = false;
+						adLock.notify();
+					}
 				}
 
 				@Override
 				public void onRequestNotFilled(AdColonyZone zone) {
-					System.out.println("Couldn't retrieve an interstitial.");
-					retrieving = false;
-					AndroidAdColonyPlatformProvider.this.notify();
+					synchronized (adLock) {
+						System.out.println("Couldn't retrieve an interstitial.");
+						retrieving = false;
+						adLock.notify();
+					}
 				}
 
 				@Override
@@ -76,7 +80,7 @@ public class AndroidAdColonyPlatformProvider extends AdColonyPlatformProvider {
 		synchronized (adLock) {
 			while (retrieving) {
 				try {
-					wait();
+					adLock.wait();
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}

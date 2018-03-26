@@ -1,0 +1,47 @@
+apply plugin: "java"
+apply plugin: "me.tatarka.retrolambda"
+apply plugin: "maven"
+
+group = "com.github.Shockah"
+
+retrolambda {
+	javaVersion JavaVersion.VERSION_1_7
+	defaultMethods true
+}
+
+dependencies {
+	compile project(':core')
+	compile "com.github.Shockah.Godwit:ios:$godwitVersion"
+}
+
+targetCompatibility = "1.8"
+sourceCompatibility = "1.8"
+[compileJava, compileTestJava]*.options*.encoding = "UTF-8"
+
+sourceSets.main {
+	java.srcDirs = ["src"]
+	resources.srcDirs = ["resources"]
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+	classifier = "sources"
+	from sourceSets.main.allSource
+}
+
+artifacts {
+	archives sourcesJar
+}
+
+jar {
+	into('META-INF/robovm/ios') {
+		from(".") {
+			include "robovm.xml"
+		}
+	}
+	into('META-INF/robovm/ios/libs') {
+		from 'libs'
+	}
+	into('META-INF/robovm/ios/resources') {
+		from 'resources'
+	}
+}

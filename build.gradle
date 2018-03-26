@@ -1,0 +1,40 @@
+buildscript {
+	repositories {
+		mavenLocal()
+		mavenCentral()
+		maven {
+			url "https://oss.sonatype.org/content/repositories/snapshots/"
+		}
+		jcenter()
+	}
+
+	dependencies {
+		classpath "me.tatarka:gradle-retrolambda:3.7.0"
+	}
+}
+
+allprojects {
+	ext {
+		appName = "Godwit"
+		gdxVersion = "1.9.8"
+		roboVMVersion = "2.3.+"
+		godwitVersion = "2.8.0.4"
+	}
+
+	repositories {
+		mavenLocal()
+		mavenCentral()
+		maven {
+			url "https://oss.sonatype.org/content/repositories/snapshots/"
+		}
+		maven {
+			url "https://oss.sonatype.org/content/repositories/releases/"
+		}
+		maven {
+			url "http://amelentev.github.io/mvnrepo/"
+		}
+		maven {
+			url "https://jitpack.io"
+		}
+	}
+}
